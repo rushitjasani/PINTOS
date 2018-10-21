@@ -59,6 +59,10 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
    Controlled by kernel command-line option "-o mlfqs". */
 bool thread_mlfqs;
 
+/*#####################################################################################*/
+  static struct list slept_list;            /* List of all the threads that are sleeping and waiting for the timer to expire */
+  static bool init_done_flag = false;       /* Prevent thread_wakeup() from executing before thread_init() */
+/*#####################################################################################*/
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
@@ -92,12 +96,19 @@ thread_init (void)
   lock_init (&tid_lock);
   list_init (&ready_list);
   list_init (&all_list);
+  /*#####################################################################################*/
+  list_init(&slept_list);
+  /*#####################################################################################*/
 
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
   initial_thread->tid = allocate_tid ();
+  /*#####################################################################################*/
+  initial_thread->wakeup_time = 0;
+  init_done_flag = true;
+  /*#####################################################################################*/
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
