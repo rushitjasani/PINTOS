@@ -74,6 +74,10 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+/*#####################################################################################*/
+void thread_sleep(int64_t, int64_t);
+void thread_wakeup(void);
+/*#####################################################################################*/
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -127,6 +131,35 @@ thread_start (void)
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
 }
+
+/*#####################################################################################*/
+void thread_sleep(int64_t start_time , int64_t sleep_time )
+{
+  ASSERT( !intr_context() );                    /* Should not be in external interrupt  */                          
+  struct thread *cur_thread = thread_current(); /* cur_thread now points to currently running thread */
+  cur_thread->wakeup_time = start_time + sleep_time;  /* Set time after which thread should wakeup */
+  list_push_back(&slept_list,&cur_thread->sleep_elem);  /* push cur_thread to slept_list */
+  thread_block(); /* block cur_thread */
+}
+
+void thread_wakeup(){
+  ASSERT( intr_get_level() == INTR_OFF );         /* check if interrupt is off */
+  int64_t now = timer_ticks();
+  struct list_elem *it = list_begin( &slept_list );
+  while( it != list_end( &slept_list ) ){
+    struct thread *cur_thread = list_entry( it, struct thread, sleep_elem );  /* storing the thread which contain sleep_elem */
+    ASSERT( is_thread( cur_thread ) == true );  /* check for valid thread */
+    if( cur_thread->wakeup_time <= now ){
+      cur_thread->wakeup_time = 0;  
+      list_remove(&cur_thread->sleep_elem); 
+      thread_unblock(cur_thread); 
+      intr_yield_on_return();   
+    }
+    it = list_next(it);
+  }
+}
+/*#####################################################################################*/
+
 
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */

@@ -92,8 +92,15 @@ timer_sleep (int64_t ticks)
   int64_t start = timer_ticks ();
 
   ASSERT (intr_get_level () == INTR_ON);
-  while (timer_elapsed (start) < ticks) 
-    thread_yield ();
+
+  if(ticks <= 0)  return;
+
+  enum intr_level intr_ORIG = intr_disable(); /* Disabling interrupt and storing prev state in intr_ORIG */
+  thread_sleep(start, ticks);                 /* Call thread_sleep to put thread to sleep */
+  intr_set_level( intr_ORIG );                /* Restore interrupt state */
+
+  // while (timer_elapsed (start) < ticks)  //REMOVED
+  //   thread_yield ();                     //REMOVED
 }
 
 /* Sleeps for approximately MS milliseconds.  Interrupts must be
