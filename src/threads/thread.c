@@ -177,7 +177,10 @@ thread_tick (void)
 #endif
   else
     kernel_ticks++;
-
+  /*#####################################################################################*/
+  if(init_done_flag)
+    thread_wakeup();
+  /*#####################################################################################*/
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
