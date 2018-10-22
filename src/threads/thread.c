@@ -158,6 +158,16 @@ void thread_wakeup(){
     it = list_next(it);
   }
 }
+/* Returns true if value A is more than value B, false otherwise. */
+bool
+greater_comparator (struct list_elem *a_, struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  struct thread *a = list_entry (a_, struct thread, elem);
+  struct thread *b = list_entry (b_, struct thread, elem);
+  
+  return a->priority > b->priority;
+}
 /*#####################################################################################*/
 
 
@@ -248,6 +258,14 @@ thread_create (const char *name, int priority,
   /* Add to run queue. */
   thread_unblock (t);
 
+  /*#####################################################################################*/
+  enum intr_level intr_ORIG;                                   
+  intr_ORIG = intr_disable();
+  /*Current thread yields if newly created thread has higher priority*/
+  struct thread *cur_thread = thread_current();
+  if(t->priority > cur_thread->priority ) thread_yield();
+  intr_set_level(intr_ORIG);
+  /*#####################################################################################*/
   return tid;
 }
 
@@ -285,6 +303,10 @@ thread_unblock (struct thread *t)
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
   list_push_back (&ready_list, &t->elem);
+  /*#####################################################################################*/
+  /*Sorting ready list in Descending order acc. to priority */
+  list_sort(&ready_list, greater_comparator, NULL);
+  /*#####################################################################################*/
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -354,8 +376,13 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
+  if (cur != idle_thread) {
     list_push_back (&ready_list, &cur->elem);
+    /*#####################################################################################*/
+    /*Sorting ready list in Descending order acc. to priority */
+    list_sort(&ready_list, greater_comparator, NULL);
+    /*#####################################################################################*/
+  }
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -383,6 +410,18 @@ void
 thread_set_priority (int new_priority) 
 {
   thread_current ()->priority = new_priority;
+  /*#####################################################################################*/
+  enum intr_level intr_ORIG;
+  intr_ORIG = intr_disable();
+  /* Currently running thread yields CPU if some higher priority thread is waiting compared
+     to newly set priority */
+  if( ( list_empty(&ready_list) == false ) &&  (thread_current()->priority) < 
+      ( list_entry( list_front(&ready_list),struct thread, elem ) )->priority)
+  {
+        thread_yield();
+  }
+  intr_set_level(intr_ORIG);
+  /*#####################################################################################*/
 }
 
 /* Returns the current thread's priority. */
