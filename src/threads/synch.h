@@ -48,4 +48,7 @@ void cond_broadcast (struct condition *, struct lock *);
    reference guide for more information.*/
 #define barrier() asm volatile ("" : : : "memory")
 
+/*#####################################################################################*/
+static bool greater_comparator_condition ( struct list_elem *, struct list_elem *,void *);
+/*#####################################################################################*/
 #endif /* threads/synch.h */

@@ -113,11 +113,20 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) 
+  if (!list_empty (&sema->waiters))
+  {
+    /*#####################################################################################*/
+    /* sorting cond->waiters list according to comparator(decreasing order based on priority) */
+    list_sort (&sema->waiters, greater_comparator, NULL);
+    /*#####################################################################################*/
     thread_unblock (list_entry (list_pop_front (&sema->waiters),
                                 struct thread, elem));
+  }
   sema->value++;
   intr_set_level (old_level);
+  /*#####################################################################################*/
+  thread_yield();
+  /*#####################################################################################*/
 }
 
 static void sema_test_helper (void *sema_);
@@ -316,9 +325,15 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) 
+  if (!list_empty (&cond->waiters))
+  {
+    /*#####################################################################################*/
+    /* sorting cond->waiters list according to comparator(decreasing order based on priority) */
+    list_sort (&cond->waiters, greater_comparator_condition, NULL); 
+    /*#####################################################################################*/
     sema_up (&list_entry (list_pop_front (&cond->waiters),
                           struct semaphore_elem, elem)->semaphore);
+  }
 }
 
 /* Wakes up all threads, if any, waiting on COND (protected by
@@ -336,3 +351,17 @@ cond_broadcast (struct condition *cond, struct lock *lock)
   while (!list_empty (&cond->waiters))
     cond_signal (cond, lock);
 }
+/*#####################################################################################*/
+/* Returns true if value A is more than value B, false otherwise. */
+static bool
+greater_comparator_condition (struct list_elem *a_, struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  struct semaphore_elem *sem1 = list_entry( a_, struct semaphore_elem, elem );
+  struct semaphore_elem *sem2 = list_entry( b_, struct semaphore_elem, elem ); 
+  struct thread *a = list_entry (list_front(&sem1->semaphore.waiters), struct thread, elem);
+  struct thread *b = list_entry (list_front(&sem2->semaphore.waiters), struct thread, elem);
+  
+  return a->priority > b->priority;
+}
+/*#####################################################################################*/
